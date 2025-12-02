@@ -24,20 +24,20 @@ This repository includes Haley Poppinga's Final Project for OCN 682: Data, Scrip
 * Scripts: Quarto documents, ShinyApp folder + contents  
 
 
-#### [Data](): _Malama Maunalua Data_  
+#### [Data](https://github.com/OCN-682-UH/Poppinga_Final_Project/tree/main/Data): _Malama Maunalua Data_  
 
 * Malama Maunalua Data  
 * Data Dictionary  
 
 
 
-#### [Scripts](): _Code_   
+#### [Scripts](https://github.com/OCN-682-UH/Poppinga_Final_Project/tree/main/Scripts): _Code_   
 
 * Cleaning and Testing Code  
 
 
 
-#### [ShinyApp](): _ShinyApp Folder_  
+#### [ShinyApp](https://github.com/OCN-682-UH/Poppinga_Final_Project/tree/main/Poppinga_FinalProject_ShinyApp): _ShinyApp Folder_  
 
 * ShinyApp Folder and Contents  
 
@@ -55,8 +55,7 @@ This repository includes Haley Poppinga's Final Project for OCN 682: Data, Scrip
 
 #### Contact  
 Feel free to contact me at hpopping@hawaii.edu
-
-[ReadMe.md]()  
+  
 
 
 
