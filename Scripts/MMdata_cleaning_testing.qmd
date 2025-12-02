@@ -336,4 +336,18 @@ MMdata_3years_clean<-MMdata_3years_clean %>%
            str_to_sentence(), # capitalize first letter only using stringr
          species_names_italic = paste0("<i>", species_names, "</i>")) # make names italic using shinyapp tags
 
-
+Old violin plot: 
+ Plot 1 (Tab 2): Relative Percent Cover of Invasive vs Native Algae Communities
+relative_cover_data<-MMdata_3years_clean %>% 
+  mutate(hits = percent_cover) # species level data with category column and % cover == count
+ Calculate relative algal percent cover b/c other way was giving us extremely high percentages
+relative_pcover<-relative_cover_data %>% # total algal hits per survey
+  group_by(plot_id, year) %>% 
+  mutate(total_hits = sum(hits[community %in% c("Native", "Invasive")], # calculate relative percent cover
+                          na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  filter(community %in% c("Native", "Invasive")) %>% 
+  group_by(plot_id, year, community) %>% 
+  summarise(hits_community = sum(hits, na.rm = TRUE),
+            total_hits = first(total_hits)) %>% 
+  mutate(relative_cover = 100* hits_community / total_hits) # calculate 0-100%, native and invasive sums to 100

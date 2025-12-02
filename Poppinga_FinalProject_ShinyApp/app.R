@@ -19,30 +19,43 @@ MMdata_3years_clean <- MMdata_3years_clean %>%
          str_to_sentence()) # capitalize first letter only using stringr
 #write.csv(MMdata_3years_clean, here("Poppinga_FinalProject_ShinyApp", "Data", "MMdata_3years_clean.csv"))
 # names(MMdata_3years_clean)
-#glimpse(MMdata_3years_clean)
+#glimpse(MMdata_3years_clean
 
 
 # Plot 1 (Tab 2): Relative Percent Cover of Invasive vs Native Algae Communities
-relative_cover_data<-MMdata_3years_clean %>% 
-  mutate(hits = percent_cover) # species level data with category column and % cover == count
+relative_pcover<-MMdata_3years_clean %>% 
+  #mutate(hits = percent_cover) # species level data with category column and % cover == count
 # Calculate relative algal percent cover b/c other way was giving us extremely high percentages
-relative_pcover<-relative_cover_data %>% # total algal hits per survey
+#relative_pcover<-relative_cover_data %>% # total algal hits per survey
   group_by(plot_id, year) %>% 
-  mutate(total_hits = sum(hits[community %in% c("Native", "Invasive")], # calculate relative percent cover
-                          na.rm = TRUE)) %>% 
-  ungroup() %>% 
-  filter(community %in% c("Native", "Invasive")) %>% 
-  group_by(plot_id, year, community) %>% 
-  summarise(hits_community = sum(hits, na.rm = TRUE),
-            total_hits = first(total_hits)) %>% 
-  mutate(relative_cover = 100* hits_community / total_hits) # calculate 0-100%, native and invasive sums to 100
+  mutate(total_hits = sum(count, na.rm = TRUE)) %>% # total algal hits per plot/year
+  filter(community %in% c("Native", "Invasive")) %>%  # only algae communities
+  group_by(plot_id, year, community, total_hits) %>% 
+  summarise(hits_community = sum(count, na.rm = TRUE)) %>% 
+  mutate(relative_cover = 100 * hits_community / total_hits)  # 0–100%
 
+# check if 2014 data is just weird: yes
+#MMdata_3years_clean %>% 
+#  filter(year == 2014) %>% 
+ # group_by(community) %>% 
+#  summarise(total_hits = sum(count, na.rm = TRUE))
+#Output:
+#community total_hits
+#<chr>          <dbl>
+#1 Invasive       1834.
+#2 Native           25 
+#3 NA              588. (probably substrate)
 
+#glimpse(relative_pcover)
 
 # Plot 2 (Tab 3): Species Mean Percent Cover Over Time
 spp_pcover<-MMdata_3years_clean %>% 
   group_by(year, species, category) %>% # summmarise to one mean per year
-  summarise(spp_mean_cover = mean(count, na.rm = TRUE))
+  summarise(spp_mean_cover = mean(count, na.rm = TRUE),
+            spp_sd_cover= sd(count, na.rm = TRUE), # add standard deviation
+            n = sum(!is.na(count))) %>% # sample size 
+  ungroup()
+
 
 species_choices_tbl <- MMdata_3years_clean %>% # easier for selection
   distinct(species, species_names) %>% # one row per species
@@ -62,6 +75,7 @@ relative_c_abundance<-MMdata_3years_clean %>%
                                   c("assessed", "huki", "quadrat_survey") ~
                                   "monthly_assessment", TRUE ~ assessment_type),
          assessment = factor(assessment, levels = c("before_huki", "after_huki", "monthly_assessment"))) # reorder
+
 
 # Plot 4 (Tab 5): Regression Between Native and Invasive Species
 regression_stuff<-MMdata_3years_clean %>% 
@@ -228,8 +242,10 @@ server <- function(input, output) {
     # Make the Violin Plot
     ggplot(cover_data(), # reactive dataframe
                          aes(x = community, y = relative_cover)) + 
-      geom_violin(trim = FALSE, alpha = 0.6) + # violin plot over a jitter plot
-      geom_jitter(width = 0.15, alpha = 0.4, size =1, color = "grey20") +
+      geom_violin(trim = FALSE, alpha = 0.6) + # violin plot over a jitter plot (maybe add adjust = 1.5 to smooth for low variance groups)
+      geom_jitter(width = 0.15, height = 0, alpha = 0.4, size =1, color = "grey20") +
+      scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) + # y axis only 0-100%
+                         #expand = expansion(mult = c(0, 0.02))) + # so violin is not squished right on x-axis
       facet_wrap(~year) + # facet the plots of each year next to each other
       labs(x = "Community Type",
            y = "Relative Percent % Cover",
@@ -247,7 +263,7 @@ server <- function(input, output) {
 
 # Percent Cover by Species Over Time (3rd Tab)
   spp_cover<-reactive({ # reactive dataframe
-    spp_cover<-spp_pcover %>% # data cleaned above
+    spp_pcover %>% # data cleaned above
     # filter by species chosen by user input
       filter(species == input$select_spp1)
     
@@ -261,9 +277,14 @@ server <- function(input, output) {
     ggplot(spp_cover(),
            aes(x = year, y = spp_mean_cover)) +
       geom_point(size = 3, alpha = 0.8, color = "grey10") +
-      geom_line(data = spp_cover(),
+      geom_line(#data = spp_cover(), # line plot
                 aes(x = year, y = spp_mean_cover, group = 1)) +
-      facet_wrap(~category) +
+      geom_errorbar(#spp_cover(), # error bar for sd of means
+                    aes(ymin = spp_mean_cover - spp_sd_cover,
+                        ymax = spp_mean_cover + spp_sd_cover),
+                    width = 0.1, alpha = 0.6) + # thinner error bars
+      scale_x_continuous(breaks = c(2014, 2019, 2024)) + # fix x axis to show specific years
+      facet_wrap(~category) + # show category the species is in at the top
       labs(x = "Year", y = "Mean Percent % Cover", # labels
            title = bquote(italic(.(species_title)) ~ "Percent Cover Over Time")) + # plot tile using species chosen
       theme_minimal(base_size = 11) + # labels/theme for a pub visualization
@@ -328,30 +349,34 @@ server <- function(input, output) {
     native_label<-natives_tbl$species_names[natives_tbl$species == input$select_native] # use brackets for selected columns
     
     # calculate axis ranges
-    x_range <- range(regression_data()$invasive, na.rm = TRUE)
-    y_range <- range(regression_data()$native, na.rm = TRUE)
+    #x_range <- range(regression_data()$invasive, na.rm = TRUE)
+    #y_range <- range(regression_data()$native, na.rm = TRUE)
     # add small padding for ranges
-    x_pad <- diff(x_range) * 0.05
-    y_pad <- diff(y_range) * 0.05
+   # x_pad <- diff(x_range) * 0.05
+   # y_pad <- diff(y_range) * 0.05
     
     # Make the Regression Plot
     ggplot(regression_data(), 
-           aes(x = invasive, # plot all data for one invasive and one native species
-               y = native)) + 
+           aes(x = log1p(invasive), # plot all data for one invasive and one native species
+               y = log1p(native))) +  # log scale (log(x +1))
       geom_point(alpha = 0.6) + # scatter plot
-      geom_jitter(alpha = 0.6, height = 0.5, width = 0.4) + # add jitter so that spreads out a little from 0
+      #geom_jitter(alpha = 0.6, height = 0.5, width = 0.4) + # add jitter so that spreads out a little from 0
       geom_smooth(method = "lm", se = TRUE, color = "#0077BB", fill = "#99CCEE") + # linear regression line
-      scale_x_continuous(limits = c(x_range[1] - x_pad, x_range[2] + x_pad)) + # scale axes for better vis
-      scale_y_continuous(limits = c(y_range[1] - y_pad, y_range[2] + y_pad)) +
-      labs(x = bquote("Invasive" ~ italic(.(invasive_label)) ~ "Percent Cover"),
-           y = bquote("Native" ~ italic(.(native_label)) ~ "Percent Cover"),
-           title = bquote("Invasive" ~ italic(.(invasive_label)) ~ "and Native" ~ italic(.(native_label)) ~ "Species Percent Cover")) +
+     # scale_x_continuous(trans = "log1p", breaks = c(0,1,2,5,10,20,50,100), # data still transformed log(x+1) but percent cover values dont look negative
+     #                    labels = c("0","1","2","5","10","20","50","100")) +
+     # scale_y_continuous(trans = "log1p", breaks = c(0,1,2,5,10,20,50,100), 
+     #                   labels = c("0","1","2","5","10","20","50","100")) +
+      #scale_x_continuous(limits = c(x_range[1] - x_pad, x_range[2] + x_pad)) + # scale axes for better vis
+      #scale_y_continuous(limits = c(y_range[1] - y_pad, y_range[2] + y_pad)) +
+      labs(x = bquote(italic(.(invasive_label)) ~ "Invasive Percent Cover"),
+           y = bquote(italic(.(native_label)) ~ "Native Percent Cover"),
+           title = bquote("Log-Transformed Invasive" ~ italic(.(invasive_label)) ~ "and Native" ~ italic(.(native_label)) ~ "Species Percent Cover")) +
       theme_minimal(base_size = 11) + # labels/theme for a pub visualization
-      theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+      theme(plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
             panel.grid = element_blank(),
-            strip.text = element_text(size = 12), # making labels bigger
-            axis.title  = element_text(size = 14),
-            axis.text   = element_text(size = 12))
+            strip.text = element_text(size = 11), # making labels bigger
+            axis.title  = element_text(size = 12),
+            axis.text   = element_text(size = 11))
   })
   
 }
