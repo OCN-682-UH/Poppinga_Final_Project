@@ -1,0 +1,12 @@
+name: Poppinga_FinalProject_ShinyApp
+title: Poppinga_FinalProject_ShinyApp
+username: hpoppinga
+account: hpoppinga
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16211553
+bundleId: 11259887
+url: https://hpoppinga.shinyapps.io/Poppinga_FinalProject_ShinyApp/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

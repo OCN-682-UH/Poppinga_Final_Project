@@ -325,6 +325,13 @@ server <- function(input, output) {
     invasive_label<-invasives_tbl$species_names[invasives_tbl$species == input$select_invasive]
     native_label<-natives_tbl$species_names[natives_tbl$species == input$select_native] # use brackets for selected columns
     
+    # calculate axis ranges
+    x_range <- range(regression_data()$invasive, na.rm = TRUE)
+    y_range <- range(regression_data()$native, na.rm = TRUE)
+    # add small padding for ranges
+    x_pad <- diff(x_range) * 0.05
+    y_pad <- diff(y_range) * 0.05
+    
     # Make the Regression Plot
     ggplot(regression_data(), 
            aes(x = invasive, # plot all data for one invasive and one native species
@@ -332,6 +339,8 @@ server <- function(input, output) {
       geom_point(alpha = 0.6) + # scatter plot
       geom_jitter(alpha = 0.6, height = 0.5, width = 0.4) + # add jitter so that spreads out a little from 0
       geom_smooth(method = "lm", se = TRUE, color = "#0077BB", fill = "#99CCEE") + # linear regression line
+      scale_x_continuous(limits = c(x_range[1] - x_pad, x_range[2] + x_pad)) + # scale axes for better vis
+      scale_y_continuous(limits = c(y_range[1] - y_pad, y_range[2] + y_pad)) +
       labs(x = bquote("Invasive" ~ italic(.(invasive_label)) ~ "Percent Cover"),
            y = bquote("Native" ~ italic(.(native_label)) ~ "Percent Cover"),
            title = bquote("Invasive" ~ italic(.(invasive_label)) ~ "and Native" ~ italic(.(native_label)) ~ "Species Percent Cover")) +
