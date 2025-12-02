@@ -1,8 +1,8 @@
 # Poppinga_Final_Project
 
-## Final Project: Mālama Maunalua ShinyApp  
-
 This repository includes Haley Poppinga's Final Project for OCN 682: Data, Script, and ShinyApp Output.  
+
+## Final Project: Mālama Maunalua ShinyApp  
 
 ----------------------------------------------------------------------------------
 ### Haley Poppinga  
@@ -14,7 +14,7 @@ This repository includes Haley Poppinga's Final Project for OCN 682: Data, Scrip
 
 **Malama Maunalua Website Link [Here](https://www.malamamaunalua.org/)!**
 
-## [Haley Poppinga's Final Project ShinyApp](https://hpoppinga.shinyapps.io/Poppinga_FinalProject_ShinyApp/).  
+## [Haley Poppinga's Final Project ShinyApp!](https://hpoppinga.shinyapps.io/Poppinga_FinalProject_ShinyApp/)   
 
 -------------------------------------------------------------------------------------
 
