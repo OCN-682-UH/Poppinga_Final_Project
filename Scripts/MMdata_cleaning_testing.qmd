@@ -1,0 +1,339 @@
+---
+title: "MM Data Cleaning and Testing"
+author: "Haley Poppinga"
+format: 
+  html:     
+    toc: true
+    theme: sandstone
+---
+
+
+In this document, I will clean and test the Malama Maunalua data for use in my ShinyApp Final Project for OCN 682.  
+
+
+### Load Libraries  
+```{r}
+#| warning: false
+#| message: false
+
+library(tidyverse)
+library(here)
+library(janitor) # clean up data package
+library(ggmap) # to make map of sites
+library(ggspatial) # scale bars and arrows
+library(ggrepel)  # site labels to maps
+library(lubridate) # fix dates
+library(fishualize) # color palette
+```
+
+### Load Data  
+```{r}
+#| warning: false
+#| message: false
+
+MMdata_shiny<-read_csv(here("Data", "MMdata_3years.csv")) # 3 years of data from 2014-2024
+```
+
+## Cleaning
+
+### Clean the Data  
+**Percent Cover Calculation**:  
+
+* Percent cover = (count/total points) x100  
+* Total possible points: 25 quadrat points x 4 quadrats = 100   
+* Multiple things counted under one point  
+```{r}
+MMdata_long<-MMdata_shiny %>% # pivot these columns longer: one row per species per assessment
+  pivot_longer(cols = avrainvillea_lacerata:sand, # from the first species to sand
+               names_to = "species",
+               values_to = "count") %>% 
+# Calculate percent cover:
+  mutate(percent_cover = (count / 100)*100) %>% 
+  mutate(percent_cover = as.numeric(percent_cover)) %>% # make sure it is numeric
+# Remove no information and area estimate data:
+  filter(!assessment_type %in% c("no_info", "area_estimate_survey", "No info", "Area estimate", "estimated", "estimate")) 
+
+# New cleaned csv to use in the Shiny App in final project repo
+#write.csv(MMdata_long, here("Data", "MMdata_long.csv"))
+```
+
+
+**View the edited dataset**:  
+```{r}
+#| warning: false
+#| message: false
+
+glimpse(MMdata_long)
+```
+
+
+**Assign species into categories**:  
+```{r}
+invasive_algae<-c("avrainvillea_lacerata", 
+                  "acanthophora_spicifera", 
+                  "gracilaria_salicornia")
+
+native_algae<-c("bryopsis_pinata", "caulerpa_racemosa", "caulerpa_sertularioides", "codium_edule", "chondria_spp", "cladophora_spp", "cladophoropsis_spp", "dictyosphaeria_cavernosa", "dictyota_acutiloba", "dictyota_friabilis", "dictyota_sandvicensis", "dictyota_spp", "gracilaria_coronopifolia", "gracilaria_parvispora", "galaxaura_rugosa", "halimeda_discoidea", "halophila_hawaiiana", "hydroclathrus_clathratus", "hypnea_spp", "leptolyngbya_crosbyana", "lyngbya_majuscula", "laurencia_nidifica", "neomeris_spp", "padina_spp", "spyridia_filamentosa", "ulva_flexuosa") # halophila is a seagrass (fix later)
+
+
+# Need to verify these are organized correctly in future  
+red_algae <- c("acanthophora_spicifera", "chondria_spp",  "galaxaura_rugosa", "gracilaria_salicornia", "hypnea_spp", "laurencia_nidifica", "spyridia_filamentosa") 
+
+green_algae <- c("avrainvillea_lacerata", "bryopsis_pinata", "caulerpa_racemosa", "caulerpa_sertularioides", "codium_edule", "cladophora_spp", "cladophoropsis_spp", "dictyosphaeria_cavernosa", "halimeda_discoidea", "neomeris_spp", "ulva_flexuosa", "ulva_spp")
+
+brown_algae <- c("dictyota_acutiloba", "dictyota_friabilis", "dictyota_sandvicensis", "dictyota_spp" , "hydroclathrus_clathratus", "padina_spp")
+
+cyanobacteria <- c("leptolyngbya_crosbyana", "lyngbya_majuscula")
+
+other<-c("halophila_hawaiiana", "other")
+
+substrate<-c("rock", "sand")
+
+```
+
+**Make new columns fpr categories and community type**:  
+```{r}
+MMdata_categories<-MMdata_long %>%  # create a new column: the species from the species column is in a certain vector (defined above)
+  mutate(category = case_when(species %in% red_algae ~ "Red Algae", 
+                              species %in% green_algae ~ "Green Algae",
+                              species %in% brown_algae ~ "Brown Algae",
+                              species %in% cyanobacteria ~ "Cyanobacteria",
+                              species %in% substrate ~ "Substrate",
+                              TRUE ~ "Other")) %>% # everything else instead of NAs
+  mutate(community = case_when(species %in% invasive_algae ~ "Invasive",
+                               species %in% native_algae ~ "Native"))
+
+# New cleaned csv to use in the Shiny App in final project repo
+#write.csv(MMdata_categories, here("Data", "MMdata_3years_clean.csv"))
+```
+
+**View the edited dataset**:  
+```{r}
+#| warning: false
+#| message: false
+
+glimpse(MMdata_categories)
+```
+
+
+## Testing  
+
+Everything below here is just testing code/plots for the Shiny App. Code may not be commented and/or may differ from what was actually used in the Shiny App.  
+
+### 1. Percent Cover of Native and Invasive Species By Year  
+```{r}
+# Clean the Data
+MMcover_hits<-MMdata_categories %>% 
+  mutate(hits = percent_cover) # species level data with category column and % cover == count
+
+# Calculate relative algal percent cover b/c other way was giving us extremely high percentages
+MMtest1<-MMcover_hits %>% # total algal hits per survey
+  group_by(plot_id, year) %>% 
+  mutate(total_hits = sum(hits[community %in% c("Native", "Invasive")], # calculate relative percent cover of communities
+                          na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  filter(community %in% c("Native", "Invasive")) %>% 
+  group_by(plot_id, year, community) %>% 
+  summarise(hits_community = sum(hits, na.rm = TRUE),
+            total_hits = first(total_hits)) %>% 
+  mutate(relative_cover = 100* hits_community / total_hits) # calculate 0-100%, native and invasive sums to 100
+
+# Make the Violin Plot
+MMtest1_plot<-ggplot(MMtest1,
+                     aes(x = community, y = relative_cover)) + 
+  geom_violin(trim = FALSE, alpha = 0.6) + # violin plot over a jitter plot
+  geom_jitter(width = 0.15, alpha = 0.4, size =1, color = "grey20") +
+  facet_wrap(~year) + # put the plots of each year next to each other
+  labs(x = "Community Type",
+       y = "Relative Percent Cover",
+       title = "Native vs. Invasive Percent Cover by Year") +
+  theme_minimal(base_size = 11) + # labels/theme for a pub visualization
+  theme(panel.grid = element_blank(),
+        plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+        panel.spacing = unit(1.2, "lines"),  # increase space between facets
+        panel.border = element_rect(fill = NA, linewidth = 0.7), # border around each plot
+        strip.text = element_text(size = 12)) # making labels bigger
+MMtest1_plot
+```
+Old way using wrong percent cover calculation:  
+MMtest1<-MMdata_categories %>% 
+  filter(category %in% c("Native", "Invasive")) %>% 
+  group_by(plot_id, year, category) %>% 
+  summarise(total_cover = sum(percent_cover, na.rm = TRUE))
+
+A way to fix species names if needed:  
+```{r}
+ # fix species names 
+    #species_data$species <- species_data$species %>% str_replace_all(c("_" = " ")) %>% # replace _ with space
+      #str_to_sentence() # make the first letter uppercase (most are Genus species, some aren't but oh well)
+```
+
+
+
+### Percent Cover by Species Over Time   
+```{r}
+MMtest2<-MMdata_categories %>% 
+  filter(species == "avrainvillea_lacerata")
+
+MMtest2_year<-MMtest2 %>% 
+  group_by(year, category) %>% # summmarise to one mean per year
+  summarise(spp_mean_cover = mean(count, na.rm = TRUE))
+
+# Make the Line Plot
+MMtest2_plot<-ggplot(MMtest2_year,
+                     aes(x = year, y = spp_mean_cover)) +
+  geom_point(size = 3, alpha = 0.8, color = "grey20") +
+  geom_line(data = MMtest2_year,
+            aes(x = year, y = spp_mean_cover, group = 1)) +
+  facet_wrap(~category) +
+  labs(x = "Year", y = "Mean Percent Cover",
+       title = "Species Percent Cover Over Time") +
+  theme_minimal(base_size = 11) + # labels/theme for a pub visualization
+  theme(panel.grid = element_blank(),
+        plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+        panel.border = element_rect(fill = NA, linewidth = 0.7), # border around plots
+        strip.text = element_text(size = 12)) # making labels bigger
+
+MMtest2_plot
+```
+In ShinyApp, ui will be to choose which species 
+
+
+
+### Relative Abundance by Category
+```{r}
+# Change order levels 
+MMdata_categories$category <- factor(MMdata_categories$category, 
+                                              levels=c("Green Algae", "Red Algae", "Brown Algae", "Cyanobacteria","Substrate", "Other" ))
+# Clean the Data
+MMdata_shiny_categories<-MMdata_categories %>% 
+  filter(!is.na(category), # filter categories
+         assessment_type != "cleared") %>% # drop these rows
+  mutate(assessment = case_when(assessment_type %in% # combine assessment types
+                                  c("assessed", "huki", "quadrat_survey") ~
+                                  "monthly_assessment", TRUE ~ assessment_type),
+         assessment = factor(assessment, levels = c("before_huki",
+                                                    "after_huki", 
+                                                    "monthly_assessment")))
+# Make the Relative Abundance Plot
+MMtest3_plot<-ggplot(MMdata_shiny_categories, 
+                     aes(x= assessment, y= count, 
+                         fill= category)) + 
+  geom_bar(stat="identity", position= "fill") + # stacked bars
+  scale_x_discrete(labels = c(before_huki = "Before Huki", after_huki = "After Huki",
+                              monthly_assessment = "Monthly Assessment")) +
+  theme_minimal() +  # theme
+  theme(axis.text.x = element_text(vjust = 1, hjust = 0.5)) + # angle of the x axis labels
+  labs(x = "Assessment Type", # labels
+       y="Relative Abundance",
+       fill = "Category",
+       title = "Relative Abundance in Categories in Year#") +
+  guides(color = "none") + # keep only legend for fill since fill and color are the same
+  scale_fill_manual(values = c("Red Algae" = "indianred2", # specify fill colors for each category
+                               "Green Algae" = "#096700", 
+                               "Brown Algae" = "#5C4F25",
+                               "Cyanobacteria" = "#3a9085", "Substrate" = "#CBBD93", 
+                               "Other" = "#333311")) +
+  scale_color_manual(values = c("Red Algae" = "indianred2", # specify line colors for each category (same as fill)
+                                "Green Algae" = "#096700", "Brown Algae" = "#5C4F25",
+                                "Cyanobacteria" = "#3a9085", "Substrate" = "#CBBD93", 
+                                "Other" = "#333311")) +
+   theme(panel.grid = element_blank(),
+        plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+        strip.text = element_text(size = 12)) # making labels bigger
+MMtest3_plot
+```
+In ShinyApp, ui would be able to select a year.
+
+
+
+### Regression: Invasive vs. Native Species  
+```{r}
+# Clean the Data
+MMtest4<-MMdata_long %>% 
+  filter(species %in% c("avrainvillea_lacerata", "halimeda_discoidea")) %>%  # filter only these species
+  group_by(plot_id, year, species) %>%  
+  summarise(percent_cover = mean(percent_cover, na.rm = TRUE)) %>% # get means
+  pivot_wider(names_from = species, # pivot wider
+              values_from = percent_cover) %>% 
+  drop_na("avrainvillea_lacerata", "halimeda_discoidea")
+
+# Make the Regression Plot
+MMtest4_plot<-ggplot(MMtest4, aes(x = avrainvillea_lacerata, # plot all data for one invasive and one native species 
+                                  y = halimeda_discoidea)) + 
+  geom_point(alpha = 0.6) + # scatter plot
+  geom_jitter(alpha = 0.6, height = 0.5, width = 0.4) + # add jitter so that spreads out a little from 0
+  geom_smooth(method = "lm", se = TRUE, color = "#0077BB", fill = "#99CCEE") + # linear regression line
+  labs(x = "Invasive avrainvillea_lacerata Percent Cover",
+       y = "Native halimeda_discoidea Percent Cover",
+       title = "Relationship Between Invasive and Native Species Percent Cover") +
+  theme_minimal(base_size = 11) + # labels/theme for a pub visualization
+  theme(panel.grid = element_blank(),
+        plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+        strip.text = element_text(size = 12)) # making labels bigger
+MMtest4_plot
+```
+In ShinyApp, the ui will have to be two dropdowns: one as the "Invasives" with the 3 main invasives and one as the "Natives" with all the other species.  
+
+
+
+
+
+
+
+
+
+
+library(ggmap) # to make map of sites
+library(ggspatial) # to add scale bars and compass arrows
+library(ggrepel) # adding site labels to map
+
+
+Not used in Shinyapp anymore:  
+ Rename algae species (will make a new spreadsheet of this and combine with datasheet)
+species_names <- c(avrainvillea_lacerata = "Avrainvillea lacerata", acanthophora_spicifera = "Acanthophora spicifera", 
+                   gracilaria_salicornia = "Gracilaria salicornia", other = "Other", bryopsis_pinata = "Bryopsis pinata", 
+                   caulerpa_racemosa = "Caulerpa racemosa", caulerpa_sertularioides = "Caulerpa sertularioides", 
+                   codium_edule = "Codium edule", chondria_spp = "Chondria spp.", cladophora_spp = "Cladophora spp.", 
+                   cladophoropsis_spp = "Cladophoropsis spp.", dictyosphaeria_cavernosa = "Dictyosphaeria cavernosa", 
+                   dictyota_acutiloba = "Dictyota acutiloba", dictyota_friabilis = "Dictyota friabilis",
+                   dictyota_sandvicensis = "Dictyota sandvicensis", dictyota_spp = "Dictyota spp.", 
+                   gracilaria_coronopifolia = "Gracilaria coronopifolia", gracilaria_parvispora = "Gracilaria parvispora", 
+                   galaxaura_rugosa = "Galaxaura rugosa", halimeda_discoidea = "Halimeda discoidea",
+                   halophila_hawaiiana = "Halophila hawaiiana", hydroclathrus_clathratus = "Hydroclathrus clathratus", 
+                   hypnea_spp = "Hypnea spp.", leptolyngbya_crosbyana = "Leptolyngbya crosbyana", 
+                   lyngbya_majuscula = "Lyngbya majuscula", laurencia_nidifica = "Laurencia nidifica",
+                   neomeris_spp = "Neomeris spp.", padina_spp = "Padina spp.", 
+                   spyridia_filamentosa = "Spyridia filamentosa", ulva_flexuosa = "Ulva flexuosa")
+
+ Make species names italic
+species_names_italic<- function(code) { # function for italicizing species 
+  if (!code %in% names(species_names)) {
+    stop(paste("Species not found:", code))
+  }
+  lab <- species_names[[code]]
+  as.expression(bquote(italic(.(lab))))
+}
+
+ Define native and invasive algae (this one done in my cleaning script but I guess I should do here)
+invasive_algae<-c("avrainvillea_lacerata", "acanthophora_spicifera", "gracilaria_salicornia")
+
+native_algae<-c("bryopsis_pinata", "caulerpa_racemosa", "caulerpa_sertularioides", 
+                "codium_edule", "chondria_spp", "cladophora_spp", "cladophoropsis_spp", 
+                "dictyosphaeria_cavernosa", "dictyota_acutiloba", "dictyota_friabilis", 
+                "dictyota_sandvicensis", "dictyota_spp", "gracilaria_coronopifolia", 
+                "gracilaria_parvispora", "galaxaura_rugosa", "halimeda_discoidea", 
+                "halophila_hawaiiana", "hydroclathrus_clathratus", "hypnea_spp", 
+                "leptolyngbya_crosbyana", "lyngbya_majuscula", "laurencia_nidifica", 
+                "neomeris_spp", "padina_spp", "spyridia_filamentosa", "ulva_flexuosa") 
+ halophila is a seagrass (fix later)
+
+
+ Rename algae species (will make a new spreadsheet of this and combine with datasheet)
+MMdata_3years_clean<-MMdata_3years_clean %>% 
+  mutate(species_names = species %>% 
+           str_replace_all("_", " ") %>%  # remove underscore and add space
+           str_to_sentence(), # capitalize first letter only using stringr
+         species_names_italic = paste0("<i>", species_names, "</i>")) # make names italic using shinyapp tags
+
+
