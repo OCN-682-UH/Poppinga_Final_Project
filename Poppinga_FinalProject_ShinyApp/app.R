@@ -17,8 +17,10 @@ MMdata_3years_clean <- MMdata_3years_clean %>%
   mutate(species_names = species %>% 
          str_replace_all("_", " ") %>%  # remove underscore and add space
          str_to_sentence()) # capitalize first letter only using stringr
-# write.csv(MMdata_3years_clean, here("Poppinga_FinalProject_ShinyApp", "Data", "MMdata_3years_clean.csv"))
+#write.csv(MMdata_3years_clean, here("Poppinga_FinalProject_ShinyApp", "Data", "MMdata_3years_clean.csv"))
 # names(MMdata_3years_clean)
+#glimpse(MMdata_3years_clean)
+
 
 # Plot 1 (Tab 2): Relative Percent Cover of Invasive vs Native Algae Communities
 relative_cover_data<-MMdata_3years_clean %>% 

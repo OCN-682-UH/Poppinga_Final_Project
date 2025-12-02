@@ -1,0 +1,18 @@
+﻿MMdata_3years_clean.csv,,
+Variable Name,Description,Type
+lat,Latitude of the monitoring plot in decimal degrees (WGS84).,numeric
+long,Longitude of the monitoring plot in decimal degrees (WGS84).,numeric
+plot_ID,"Unique plot identifier per each fixed plot location (lat/long pairing) (e.g., plot001).",character
+great_huki_year,Calendar year of the Great Huki restoration event associated with the plot (if applicable).,numeric
+month,Month of assessment survey (1-12).,numeric
+year,"Calendar year of assessment survey (2014, 2019, 2024).",numeric
+assessment_type,"Type of assessment conducted. Values: 'before_huki', 'after_huki', 'huki', 'assessed', 'quadrat_survey'.",character
+assessment_date,Calendar date of assessment survey in YYYY-MM-DD format.,date
+years_posthuki,Integer years since the huki event or assessment date.,numeric
+sand_depth_mean,Mean sand depth measured during assessment (in cm).,numeric
+species,"Species or substrate code, representing macroalgal species or substrate type (e.g., 'avrainvillea_lacerata').",character
+count,Point-intercept count (hits) of alga taxa or substrate. Each plot: 25 quadrat points x 4 replicate s= 100 possible hits.,numeric
+percent_cover,Percent cover (%) (count / total_points) × 100. Values may exceed 100 across categories because multiple species can occur under a single point.,numeric
+category,"Morphological/functional group. Values: 'Green Algae', 'Red Algae', 'Brown Algae', 'Cyanobacteria', 'Substrate', 'Other'.",character
+community,"Restoration priority ecological grouping (community type). Values: 'Native', 'Invasive', 'NA' for 'Other'/substrate.",character
+species_names,"Readable species names with spaces and capitalization (e.g., ""Avrainvillea lacerata"").",character
